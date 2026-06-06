@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from monitors.services.monitor_service import (
     register_monitor,
+    heartbeat_monitor,
     get_monitor,
     get_all_monitors,
 )
@@ -19,7 +20,6 @@ class MonitorListView(APIView):
         """POST /monitors — register a new monitor"""
         data = request.data
 
-        # Validate required fields
         required = ['id', 'timeout', 'alert_email']
         for field in required:
             if field not in data:
@@ -32,7 +32,6 @@ class MonitorListView(APIView):
         timeout     = data['timeout']
         alert_email = data['alert_email']
 
-        # Validate timeout is a positive integer
         if not isinstance(timeout, int) or timeout <= 0:
             return Response(
                 {'error': 'timeout must be a positive integer (seconds)'},
@@ -67,3 +66,24 @@ class MonitorDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         return Response(monitor, status=status.HTTP_200_OK)
+
+
+class HeartbeatView(APIView):
+
+    def post(self, request, device_id):
+        """POST /monitors/{id}/heartbeat — reset the timer"""
+        result, error = heartbeat_monitor(device_id)
+
+        if error == 'not_found':
+            return Response(
+                {'error': f'Monitor {device_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if error == 'down':
+            return Response(
+                {'error': f'Monitor {device_id} is down — re-register to resume'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(result, status=status.HTTP_200_OK)

@@ -1,6 +1,6 @@
-import json
 from datetime import datetime, timezone
 from redis_client.client import get_redis_client
+
 
 def register_monitor(device_id, timeout, alert_email):
     """
@@ -10,13 +10,11 @@ def register_monitor(device_id, timeout, alert_email):
     """
     r = get_redis_client()
 
-    # Check if monitor already exists
     if r.exists(f'monitor:{device_id}'):
         return None, 'Monitor with this ID already exists'
 
     now = datetime.now(timezone.utc).isoformat()
 
-    # Store monitor data as a Redis hash
     r.hset(f'monitor:{device_id}', mapping={
         'id':          device_id,
         'timeout':     timeout,
@@ -26,15 +24,56 @@ def register_monitor(device_id, timeout, alert_email):
         'updated_at':  now,
     })
 
-    # Set the expiring TTL key — this is what Redis watches
-    r.set(f'ttl:{device_id}', '1', ex=timeout)
+    r.set(f'ttl:{device_id}', '1', ex=int(timeout))
 
     return {
         'id':          device_id,
-        'timeout':     timeout,
+        'timeout':     int(timeout),
         'alert_email': alert_email,
         'status':      'active',
         'created_at':  now,
+    }, None
+
+
+def heartbeat_monitor(device_id):
+    """
+    Resets the countdown timer for a monitor.
+    - If monitor does not exist → return error
+    - If monitor is down → return error
+    - If monitor is paused → unpause and restart timer
+    - If monitor is active → reset timer
+    """
+    r = get_redis_client()
+
+    data = r.hgetall(f'monitor:{device_id}')
+    if not data:
+        return None, 'not_found'
+
+    current_status = data.get('status')
+    timeout = int(data.get('timeout', 60))
+
+    if current_status == 'down':
+        return None, 'down'
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Reset the TTL key (also unpauses if paused)
+    r.set(f'ttl:{device_id}', '1', ex=timeout)
+
+    # Update status to active and refresh updated_at
+    r.hset(f'monitor:{device_id}', mapping={
+        'status':     'active',
+        'updated_at': now,
+    })
+
+    # Clear any backoff alert keys if they exist
+    r.delete(f'backoff:{device_id}')
+
+    return {
+        'id':         device_id,
+        'status':     'active',
+        'message':    'Heartbeat received — timer reset',
+        'updated_at': now,
     }, None
 
 
