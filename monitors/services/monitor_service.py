@@ -3,11 +3,6 @@ from redis_client.client import get_redis_client
 
 
 def register_monitor(device_id, timeout, alert_email):
-    """
-    Registers a new monitor in Redis.
-    - monitor:{id} → hash storing device info and status
-    - ttl:{id}     → expiring key that triggers the alert
-    """
     r = get_redis_client()
 
     if r.exists(f'monitor:{device_id}'):
@@ -36,13 +31,6 @@ def register_monitor(device_id, timeout, alert_email):
 
 
 def heartbeat_monitor(device_id):
-    """
-    Resets the countdown timer for a monitor.
-    - If monitor does not exist → return error
-    - If monitor is down → return error
-    - If monitor is paused → unpause and restart timer
-    - If monitor is active → reset timer
-    """
     r = get_redis_client()
 
     data = r.hgetall(f'monitor:{device_id}')
@@ -60,13 +48,13 @@ def heartbeat_monitor(device_id):
     # Reset the TTL key (also unpauses if paused)
     r.set(f'ttl:{device_id}', '1', ex=timeout)
 
-    # Update status to active and refresh updated_at
+    # Update status to active
     r.hset(f'monitor:{device_id}', mapping={
         'status':     'active',
         'updated_at': now,
     })
 
-    # Clear any backoff alert keys if they exist
+    # Clear any backoff keys
     r.delete(f'backoff:{device_id}')
 
     return {
@@ -77,8 +65,46 @@ def heartbeat_monitor(device_id):
     }, None
 
 
+def pause_monitor(device_id):
+    """
+    Pauses a monitor by removing the TTL key.
+    Redis PERSIST removes the expiry — key stays forever until deleted.
+    No alerts will fire while paused.
+    """
+    r = get_redis_client()
+
+    data = r.hgetall(f'monitor:{device_id}')
+    if not data:
+        return None, 'not_found'
+
+    current_status = data.get('status')
+
+    if current_status == 'down':
+        return None, 'down'
+
+    if current_status == 'paused':
+        return None, 'already_paused'
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Remove the TTL — timer stops completely
+    r.persist(f'ttl:{device_id}')
+
+    # Update status to paused
+    r.hset(f'monitor:{device_id}', mapping={
+        'status':     'paused',
+        'updated_at': now,
+    })
+
+    return {
+        'id':         device_id,
+        'status':     'paused',
+        'message':    'Monitor paused — no alerts will fire',
+        'updated_at': now,
+    }, None
+
+
 def get_monitor(device_id):
-    """Fetch a single monitor by ID."""
     r = get_redis_client()
     data = r.hgetall(f'monitor:{device_id}')
     if not data:
@@ -87,7 +113,6 @@ def get_monitor(device_id):
 
 
 def get_all_monitors():
-    """Fetch all registered monitors."""
     r = get_redis_client()
     keys = r.keys('monitor:*')
     monitors = []
