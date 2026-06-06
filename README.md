@@ -7,28 +7,8 @@ Built with **Python + Django + Redis**.
 ---
 
 ## Architecture Diagram
-[Device] ──POST /monitors──────────────► [Django API]
-│
-Save to Redis
-Start TTL key
-│
-[Device] ──POST /heartbeat─────────────► [Django API]
-│
-Reset TTL key
-│
-Timer expires?
-│
-[Redis keyspace event]
-│
-[Listener command]
-│
-┌──────────▼──────────┐
-│   Alert 1 WARNING   │ immediately
-│   Alert 2 URGENT    │ +30s
-│   Alert 3 CRITICAL  │ +90s
-└─────────────────────┘
+<img width="571" height="1151" alt="image" src="https://github.com/user-attachments/assets/eb12b329-eedb-4403-b616-c5df9cf5ba00" />
 
----
 
 ## How It Works
 
@@ -52,7 +32,7 @@ Timer expires?
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/YOUR_USERNAME/pulse-check-api.git
+git clone https://github.com/KingJoe-14/pulse-check-api.git
 cd pulse-check-api
 ```
 
