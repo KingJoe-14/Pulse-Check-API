@@ -49,7 +49,7 @@ pip install -r requirements.txt
 
 **4. Create your `.env` file**
 ```bash
-cp .env.example .env
+cp .env
 ```
 
 **5. Start Redis**
