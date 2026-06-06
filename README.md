@@ -1,135 +1,309 @@
-# Pulse-Check-API ("Watchdog" Sentinel)
-This challenge is designed to test your ability to bridge Computer Science fundamentals with Modern Backend Engineering.
+# Pulse-Check-API — Dead Man's Switch Monitor
 
-## 1. Business Context
-> **Client:** *CritMon Servers Inc.* (A Critical Infrastructure Monitoring Company).
+A production-grade backend service that monitors remote devices (solar farms, weather stations, etc.) and triggers escalating alerts when a device stops sending heartbeats.
 
-### The Problem
-CritMon provides monitoring for remote solar farms and unmanned weather stations in areas with poor connectivity. These devices are supposed to send "I'm alive" signals every hour.
-
-Currently, CritMon has no way of knowing if a device has gone offline (due to power failure or theft) until a human manually checks the logs. They need a system that alerts *them* when a device *stops* talking.
-
-### The Solution
-You need to build a **Dead Man’s Switch API**. Devices will register a "monitor" with a countdown timer (e.g., 60 seconds). If the device fails to "ping" (send a heartbeat) to the API before the timer runs out, the system automatically triggers an alert.
+Built with **Python + Django + Redis**.
 
 ---
 
-## 2. Technical Objective
-Build a backend service that manages stateful timers.
-
-* **Registration:** Allow a client to create a monitor with a specific timeout duration.
-* **Heartbeat:** Reset the countdown when a ping is received.
-* **Trigger:** Fire a webhook (or log a critical error) if the countdown reaches zero.
-
-
----
-
-## 3. Getting Started
-
-1.  **Fork this Repository:** Do not clone it directly. Create a fork to your own GitHub account.
-2.  **Environment:** You may use **Node.js, Python, Java or Go, etc.**.
-3.  **Submission:** Your final submission will be a link to your forked repository containing:
-    * The source code.
-    * The **Architecture Diagram**
-    * The `README.md` with documentation.
-
----
-
-## 4. The Architecture Diagram 
-**Task:** Before you write any code, you must design the logic flow.
-**Deliverable:** A **Sequence Diagram** or **State Flowchart** embedded in your `README.md`.
+## Architecture Diagram
+[Device] ──POST /monitors──────────────► [Django API]
+│
+Save to Redis
+Start TTL key
+│
+[Device] ──POST /heartbeat─────────────► [Django API]
+│
+Reset TTL key
+│
+Timer expires?
+│
+[Redis keyspace event]
+│
+[Listener command]
+│
+┌──────────▼──────────┐
+│   Alert 1 WARNING   │ immediately
+│   Alert 2 URGENT    │ +30s
+│   Alert 3 CRITICAL  │ +90s
+└─────────────────────┘
 
 ---
 
-## 5. User Stories & Acceptance Criteria
+## How It Works
 
-### User Story 1: Registering a Monitor
-**As a** device administrator,  
-**I want to** create a new monitor for my device,  
-**So that** the system knows to track its status.
-
-**Acceptance Criteria:**
-- [ ] The API accepts a `POST /monitors` request.
-- [ ] Input: `{"id": "device-123", "timeout": 60, "alert_email": "admin@critmon.com"}`.
-- [ ] The system starts a countdown timer for 60 seconds associated with `device-123`.
-- [ ] Response: `201 Created` with a confirmation message.
-
-### User Story 2: The Heartbeat (Reset)
-**As a** remote device,  
-**I want to** send a signal to the server,  
-**So that** my timer is reset and no alert is sent.
-
-**Acceptance Criteria:**
-- [ ] The API accepts a `POST /monitors/{id}/heartbeat` request.
-- [ ] If the ID exists and the timer has NOT expired:
-    - [ ] Restart the countdown from the beginning (e.g., reset to 60 seconds).
-    - [ ] Return `200 OK`.
-- [ ] If the ID does not exist:
-    - [ ] Return `404 Not Found`.
-
-### User Story 3: The Alert (Failure State)
-**As a** support engineer,  
-**I want to** be notified immediately if a device stops sending heartbeats,  
-**So that** I can deploy a repair team.
-
-**Acceptance Criteria:**
-- [ ] If the timer for `device-123` reaches 0 seconds (no heartbeat received):
-    - [ ] The system must internally "fire" an alert.
-    - [ ] **Implementation:** For this project, simply `console.log` a JSON object: `{"ALERT": "Device device-123 is down!", "time": <timestamp>}`. (Or simulate sending an email).
-    - [ ] The monitor status changes to `down`.
+1. A device registers a monitor with a timeout (e.g. 60 seconds)
+2. Redis starts a countdown (TTL key)
+3. The device sends heartbeats to reset the timer
+4. If no heartbeat arrives before the timer hits zero, Redis fires an expiry event
+5. A background listener catches the event and fires escalating alerts
+6. A maintenance technician can pause monitoring to avoid false alarms
 
 ---
 
-## 6. Bonus User Story (The "Snooze" Button)
-**As a** maintenance technician,  
-**I want to** pause monitoring while I am repairing a device,  
-**So that** I don't trigger false alarms.
+## Setup Instructions
 
-**Acceptance Criteria:**
-- [ ] Create a `POST /monitors/{id}/pause` endpoint.
-- [ ] When called, the timer stops completely. No alerts will fire.
-- [ ] Calling the heartbeat endpoint again automatically "un-pauses" the monitor and restarts the timer.
+### Requirements
+- Python 3.10+
+- Redis server
+- pip
+
+### Installation
+
+**1. Clone the repository**
+```bash
+git clone https://github.com/YOUR_USERNAME/pulse-check-api.git
+cd pulse-check-api
+```
+
+**2. Create and activate a virtual environment**
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+**3. Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+**4. Create your `.env` file**
+```bash
+cp .env.example .env
+```
+
+**5. Start Redis**
+```bash
+sudo service redis-server start
+```
+
+**6. Enable Redis keyspace notifications**
+```bash
+redis-cli config set notify-keyspace-events Ex
+```
+
+**7. Run database-free check**
+```bash
+python manage.py check
+```
+
+### Running the Service
+
+You need **two terminals** running simultaneously:
+
+**Terminal 1 — API server**
+```bash
+python manage.py runserver
+```
+
+**Terminal 2 — Keyspace listener**
+```bash
+python manage.py start_listener
+```
 
 ---
 
-## 7. The "Developer's Choice" Challenge
-We value engineers who look for "what's missing."
+## API Documentation
 
-**Task:** Identify **one** additional feature that makes this system more robust or user-friendly.
-1.  **Implement it.**
-2.  **Document it:** Explain *why* you added it in your README.
+### Base URL
+http://127.0.0.1:8000
 
 ---
 
-## 8. Documentation Requirements
-Your final `README.md` must replace these instructions. It must cover:
+### 1. Register a Monitor
+**POST** `/monitors/`
 
-1.  **Architecture Diagram** 
-2.  **Setup Instructions** 
-3.  **API Documentation** 
-4.  **The Developer's Choice:** Explanation of your added feature.
+Registers a new device monitor and starts the countdown timer.
+
+**Request body:**
+```json
+{
+    "id": "device-123",
+    "timeout": 60,
+    "alert_email": "admin@critmon.com"
+}
+```
+
+**Responses:**
+
+| Status | Description |
+|--------|-------------|
+| 201 | Monitor created successfully |
+| 400 | Missing or invalid fields |
+| 409 | Monitor with this ID already exists |
+
+**Example response (201):**
+```json
+{
+    "message": "Monitor for device-123 created successfully",
+    "monitor": {
+        "id": "device-123",
+        "timeout": 60,
+        "alert_email": "admin@critmon.com",
+        "status": "active",
+        "created_at": "2026-06-06T19:37:30.260117+00:00"
+    }
+}
+```
 
 ---
-Submit your repo link via the [online](https://forms.office.com/e/rGKtfeZCsH) form.
 
-## 🛑 Pre-Submission Checklist
-**WARNING:** Before you submit your solution, you **MUST** pass every item on this list.
-If you miss any of these critical steps, your submission will be **automatically rejected** and you will **NOT** be invited to an interview.
+### 2. Send Heartbeat
+**POST** `/monitors/{id}/heartbeat/`
 
-### 1. 📂 Repository & Code
-- [ ] **Public Access:** Is your GitHub repository set to **Public**? (We cannot review private repos).
-- [ ] **Clean Code:** Did you remove unnecessary files (like `node_modules`, `.env` with real keys, or `.DS_Store`)?
-- [ ] **Run Check:** if we clone your repo and run `npm start` (or equivalent), does the server start immediately without crashing?
+Resets the countdown timer. Automatically unpauses a paused monitor.
 
-### 2. 📄 Documentation (Crucial)
-- [ ] **Architecture Diagram:** Did you include a visual Diagram (Flowchart or Sequence Diagram) in the README?
-- [ ] **README Swap:** Did you **DELETE** the original instructions (the problem brief) from this file and replace it with your own documentation?
-- [ ] **API Docs:** Is there a clear list of Endpoints and Example Requests in the README?
+**No request body needed.**
 
+**Responses:**
 
-### 3. 🧹 Git Hygiene
-- [ ] **Commit History:** Does your repo have multiple commits with meaningful messages? (A single "Initial Commit" is a red flag).
+| Status | Description |
+|--------|-------------|
+| 200 | Timer reset successfully |
+| 404 | Monitor not found |
+| 400 | Monitor is down — re-register to resume |
+
+**Example response (200):**
+```json
+{
+    "id": "device-123",
+    "status": "active",
+    "message": "Heartbeat received — timer reset",
+    "updated_at": "2026-06-06T19:45:00.000000+00:00"
+}
+```
 
 ---
-**Ready?**
-If you checked all the boxes above, submit your repository link in the application form. Good luck! 🚀
+
+### 3. Pause a Monitor
+**POST** `/monitors/{id}/pause/`
+
+Freezes the timer completely. No alerts will fire while paused.
+Sending a heartbeat automatically resumes the monitor.
+
+**No request body needed.**
+
+**Responses:**
+
+| Status | Description |
+|--------|-------------|
+| 200 | Monitor paused successfully |
+| 400 | Monitor is already paused or is down |
+| 404 | Monitor not found |
+
+**Example response (200):**
+```json
+{
+    "id": "device-123",
+    "status": "paused",
+    "message": "Monitor paused — no alerts will fire",
+    "updated_at": "2026-06-06T19:50:00.000000+00:00"
+}
+```
+
+---
+
+### 4. List All Monitors
+**GET** `/monitors/`
+
+Returns all registered monitors and their current status.
+
+**Example response (200):**
+```json
+[
+    {
+        "id": "device-123",
+        "timeout": "60",
+        "alert_email": "admin@critmon.com",
+        "status": "active",
+        "created_at": "2026-06-06T19:37:30.260117+00:00",
+        "updated_at": "2026-06-06T19:45:00.000000+00:00"
+    }
+]
+```
+
+---
+
+### 5. Get Single Monitor
+**GET** `/monitors/{id}/`
+
+Returns a single monitor by ID.
+
+**Responses:**
+
+| Status | Description |
+|--------|-------------|
+| 200 | Monitor found |
+| 404 | Monitor not found |
+
+---
+
+## Alert System
+
+When a device misses its heartbeat the system fires three escalating alerts logged to the listener console:
+
+| Alert | Severity | When |
+|-------|----------|------|
+| Alert 1 | WARNING  | Immediately when timer expires |
+| Alert 2 | URGENT   | 30 seconds after Alert 1 |
+| Alert 3 | CRITICAL | 90 seconds after Alert 2 |
+
+**Example alert output:**
+```json
+{"ALERT": "Device device-123 is down!", "severity": "WARNING", "email": "admin@critmon.com", "time": "2026-06-06T21:13:49.500142+00:00"}
+{"ALERT": "Device device-123 is still down!", "severity": "URGENT", "email": "admin@critmon.com", "time": "2026-06-06T21:14:19.578988+00:00"}
+{"ALERT": "Device device-123 is still down!", "severity": "CRITICAL", "email": "admin@critmon.com", "time": "2026-06-06T21:15:49.612045+00:00"}
+```
+
+Alerts stop escalating as soon as the device sends a heartbeat again.
+
+---
+
+## Developer's Choice — Exponential Backoff Alerts
+
+### What it is
+Instead of firing a single alert when a device goes down, the system escalates notifications with increasing urgency over time.
+
+### Why it was added
+A single alert is easy to miss. In a critical infrastructure context (solar farms, unmanned weather stations), a missed alert could mean hours of downtime before anyone responds. Escalating alerts ensure that:
+
+- A first responder sees the WARNING immediately
+- If unacknowledged, the URGENT alert creates pressure to act
+- The CRITICAL alert signals a serious outage requiring immediate deployment
+
+### How it works
+Redis backoff keys with expiring TTLs drive the escalation. Each alert schedules the next one by setting a new key with a delay. If the device recovers and sends a heartbeat, the backoff keys are cleared and escalation stops.
+
+---
+
+## Project Structure
+pulse-check-api/
+├── config/                          # Django project settings
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── monitors/                        # Core app
+│   ├── views.py                     # API endpoints
+│   ├── urls.py                      # URL routing
+│   ├── services/
+│   │   ├── monitor_service.py       # Register, heartbeat, pause logic
+│   │   └── alert_service.py        # Alert firing and backoff
+│   └── management/commands/
+│       └── start_listener.py        # Redis keyspace event listener
+├── redis_client/
+│   └── client.py                    # Redis singleton
+├── .env.example                     # Environment variable template
+├── requirements.txt
+└── manage.py
+
+---
+
+## Pre-Submission Checklist
+
+- ✅ Repository is public
+- ✅ No `node_modules`, `.env`, or sensitive files committed
+- ✅ Server starts with `python manage.py runserver`
+- ✅ Architecture diagram included
+- ✅ Original instructions replaced with this README
+- ✅ All endpoints documented with example requests
+- ✅ Multiple meaningful commits
