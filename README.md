@@ -9,6 +9,7 @@ Built with **Python + Django + Redis**.
 ## Architecture Diagram
 <img width="571" height="1151" alt="image" src="https://github.com/user-attachments/assets/eb12b329-eedb-4403-b616-c5df9cf5ba00" />
 
+---
 
 ## How It Works
 
@@ -32,8 +33,8 @@ Built with **Python + Django + Redis**.
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/KingJoe-14/pulse-check-api.git
-cd pulse-check-api
+git clone https://github.com/KingJoe-14/Pulse-Check-API.git
+cd Pulse-Check-API
 ```
 
 **2. Create and activate a virtual environment**
@@ -47,10 +48,27 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**4. Create your `.env` file**
+**4. Set up your environment variables**
+
+Copy the example file and fill in your values:
 ```bash
-cp .env
+cp .env.example .env
 ```
+
+The `.env.example` file looks like this:
+SECRET_KEY=your-secret-key-here
+DEBUG=True
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_DB=0
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SECRET_KEY` | Django secret key | required |
+| `DEBUG` | Debug mode | `True` |
+| `REDIS_HOST` | Redis server host | `127.0.0.1` |
+| `REDIS_PORT` | Redis server port | `6379` |
+| `REDIS_DB` | Redis database number | `0` |
 
 **5. Start Redis**
 ```bash
@@ -218,6 +236,30 @@ Returns a single monitor by ID.
 
 ---
 
+### 6. Delete a Monitor
+**DELETE** `/monitors/{id}/`
+
+Permanently deletes a monitor and stops all associated timers and alerts.
+Works regardless of monitor status (active, paused, or down).
+
+**No request body needed.**
+
+**Responses:**
+
+| Status | Description |
+|--------|-------------|
+| 200 | Monitor deleted successfully |
+| 404 | Monitor not found |
+
+**Example response (200):**
+```json
+{
+    "message": "Monitor device-123 deleted successfully"
+}
+```
+
+---
+
 ## Alert System
 
 When a device misses its heartbeat the system fires three escalating alerts logged to the listener console:
@@ -266,7 +308,7 @@ pulse-check-api/
 │   ├── views.py                     # API endpoints
 │   ├── urls.py                      # URL routing
 │   ├── services/
-│   │   ├── monitor_service.py       # Register, heartbeat, pause logic
+│   │   ├── monitor_service.py       # Register, heartbeat, pause, delete logic
 │   │   └── alert_service.py        # Alert firing and backoff
 │   └── management/commands/
 │       └── start_listener.py        # Redis keyspace event listener
