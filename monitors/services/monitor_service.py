@@ -121,3 +121,20 @@ def get_all_monitors():
         if data:
             monitors.append(data)
     return monitors
+
+
+def delete_monitor(device_id):
+    """
+    Deletes a monitor and all its associated Redis keys.
+    """
+    r = get_redis_client()
+
+    if not r.exists(f'monitor:{device_id}'):
+        return None, 'not_found'
+
+    r.delete(f'monitor:{device_id}')
+    r.delete(f'ttl:{device_id}')
+    r.delete(f'backoff:{device_id}:1')
+    r.delete(f'backoff:{device_id}:2')
+
+    return {'message': f'Monitor {device_id} deleted successfully'}, None

@@ -5,6 +5,7 @@ from monitors.services.monitor_service import (
     register_monitor,
     heartbeat_monitor,
     pause_monitor,
+    delete_monitor,
     get_monitor,
     get_all_monitors,
 )
@@ -67,6 +68,18 @@ class MonitorDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         return Response(monitor, status=status.HTTP_200_OK)
+
+    def delete(self, request, device_id):
+        """DELETE /monitors/{id} — delete a monitor"""
+        result, error = delete_monitor(device_id)
+
+        if error == 'not_found':
+            return Response(
+                {'error': f'Monitor {device_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class HeartbeatView(APIView):
