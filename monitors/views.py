@@ -6,6 +6,7 @@ from monitors.services.monitor_service import (
     heartbeat_monitor,
     pause_monitor,
     delete_monitor,
+    recover_monitor,
     get_monitor,
     get_all_monitors,
 )
@@ -96,7 +97,7 @@ class HeartbeatView(APIView):
 
         if error == 'down':
             return Response(
-                {'error': f'Monitor {device_id} is down — re-register to resume'},
+                {'error': f'Monitor {device_id} is down — use /recover to resume'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -117,13 +118,34 @@ class PauseView(APIView):
 
         if error == 'down':
             return Response(
-                {'error': f'Monitor {device_id} is down — cannot pause'},
+                {'error': f'Monitor {device_id} is down — use /recover to resume'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if error == 'already_paused':
             return Response(
                 {'error': f'Monitor {device_id} is already paused'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class RecoverView(APIView):
+
+    def post(self, request, device_id):
+        """POST /monitors/{id}/recover — recover a down monitor"""
+        result, error = recover_monitor(device_id)
+
+        if error == 'not_found':
+            return Response(
+                {'error': f'Monitor {device_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if error == 'not_down':
+            return Response(
+                {'error': f'Monitor {device_id} is not down — only down monitors can be recovered'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

@@ -4,6 +4,7 @@ from monitors.views import (
     MonitorDetailView,
     HeartbeatView,
     PauseView,
+    RecoverView,
 )
 
 urlpatterns = [
@@ -11,4 +12,5 @@ urlpatterns = [
     path('monitors/<str:device_id>/', MonitorDetailView.as_view(), name='monitor-detail'),
     path('monitors/<str:device_id>/heartbeat/', HeartbeatView.as_view(), name='monitor-heartbeat'),
     path('monitors/<str:device_id>/pause/', PauseView.as_view(), name='monitor-pause'),
+    path('monitors/<str:device_id>/recover/', RecoverView.as_view(), name='monitor-recover'),
 ]

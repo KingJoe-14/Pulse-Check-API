@@ -122,6 +122,46 @@ def get_all_monitors():
             monitors.append(data)
     return monitors
 
+def recover_monitor(device_id):
+    """
+    Recovers a down monitor back to active state.
+    Resets the timer and clears all backoff keys.
+    Only works when monitor status is down.
+    """
+    r = get_redis_client()
+
+    data = r.hgetall(f'monitor:{device_id}')
+    if not data:
+        return None, 'not_found'
+
+    current_status = data.get('status')
+
+    if current_status != 'down':
+        return None, 'not_down'
+
+    now = datetime.now(timezone.utc).isoformat()
+    timeout = int(data.get('timeout', 60))
+
+    # Restart the TTL key
+    r.set(f'ttl:{device_id}', '1', ex=timeout)
+
+    # Clear all backoff keys
+    r.delete(f'backoff:{device_id}:1')
+    r.delete(f'backoff:{device_id}:2')
+
+    # Reset status to active
+    r.hset(f'monitor:{device_id}', mapping={
+        'status':     'active',
+        'updated_at': now,
+    })
+
+    return {
+        'id':         device_id,
+        'status':     'active',
+        'message':    f'Monitor {device_id} recovered — timer restarted',
+        'updated_at': now,
+    }, None
+
 
 def delete_monitor(device_id):
     """
