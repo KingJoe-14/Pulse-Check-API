@@ -159,7 +159,7 @@ Resets the countdown timer. Automatically unpauses a paused monitor.
 |--------|-------------|
 | 200 | Timer reset successfully |
 | 404 | Monitor not found |
-| 400 | Monitor is down — re-register to resume |
+| 400 | Monitor is down — use /recover to resume |
 
 **Example response (200):**
 ```json
@@ -234,9 +234,49 @@ Returns a single monitor by ID.
 | 200 | Monitor found |
 | 404 | Monitor not found |
 
+**Example response (200):**
+```json
+{
+    "id": "device-123",
+    "timeout": "60",
+    "alert_email": "admin@critmon.com",
+    "status": "active",
+    "created_at": "2026-06-06T19:37:30.260117+00:00",
+    "updated_at": "2026-06-06T19:45:00.000000+00:00"
+}
+```
+
 ---
 
-### 6. Delete a Monitor
+### 6. Recover a Monitor
+**POST** `/monitors/{id}/recover/`
+
+Recovers a down monitor back to active state. Restarts the timer and
+clears all backoff alert keys. Only works when monitor status is `down`.
+
+**No request body needed.**
+
+**Responses:**
+
+| Status | Description |
+|--------|-------------|
+| 200 | Monitor recovered successfully |
+| 400 | Monitor is not down |
+| 404 | Monitor not found |
+
+**Example response (200):**
+```json
+{
+    "id": "device-123",
+    "status": "active",
+    "message": "Monitor device-123 recovered — timer restarted",
+    "updated_at": "2026-06-09T14:19:27.970093+00:00"
+}
+```
+
+---
+
+### 7. Delete a Monitor
 **DELETE** `/monitors/{id}/`
 
 Permanently deletes a monitor and stops all associated timers and alerts.
@@ -308,7 +348,7 @@ pulse-check-api/
 │   ├── views.py                     # API endpoints
 │   ├── urls.py                      # URL routing
 │   ├── services/
-│   │   ├── monitor_service.py       # Register, heartbeat, pause, delete logic
+│   │   ├── monitor_service.py       # Register, heartbeat, pause, recover, delete logic
 │   │   └── alert_service.py        # Alert firing and backoff
 │   └── management/commands/
 │       └── start_listener.py        # Redis keyspace event listener
