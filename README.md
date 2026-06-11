@@ -50,12 +50,12 @@ pip install -r requirements.txt
 
 **4. Set up your environment variables**
 
-Copy the example file and fill in your values:
+Create a `.env` file in the root directory:
 ```bash
-cp .env
+touch .env
 ```
 
-The `.env` file looks like this:
+Then add the following variables to the `.env` file:
 SECRET_KEY=your-secret-key-here
 DEBUG=True
 REDIS_HOST=127.0.0.1
@@ -354,7 +354,7 @@ pulse-check-api/
 │       └── start_listener.py        # Redis keyspace event listener
 ├── redis_client/
 │   └── client.py                    # Redis singleton
-├── .env.example                     # Environment variable template
+├── .env                             # Environment variables (not committed)
 ├── requirements.txt
 └── manage.py
 
