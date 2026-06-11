@@ -52,10 +52,10 @@ pip install -r requirements.txt
 
 Copy the example file and fill in your values:
 ```bash
-cp .env.example .env
+cp .env
 ```
 
-The `.env.example` file looks like this:
+The `.env` file looks like this:
 SECRET_KEY=your-secret-key-here
 DEBUG=True
 REDIS_HOST=127.0.0.1
